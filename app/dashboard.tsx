@@ -5,14 +5,6 @@ import { useRef, useState } from "react";
 import api from "./components/ApiClient";
 import Tesseract from "tesseract.js";
 
-// --- PDF and OCR helpers (inlined) ---
-// import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import * as pdfjsLib from "pdfjs-dist";
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-
-// Set workerSrc for pdfjs
-// pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
 // Convert PDF to images
 async function pdfToImages(
   uint8: Uint8Array,
@@ -22,6 +14,10 @@ async function pdfToImages(
     onStart?: (progress: { current: 0; total: number }) => void;
   }
 ): Promise<string[]> {
+  // Dynamically import pdfjs-dist only on the client
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
+
   const output: string[] = [];
   const doc = await pdfjsLib.getDocument(uint8).promise;
   options?.onStart && options.onStart({ current: 0, total: doc.numPages });
