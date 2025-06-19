@@ -112,7 +112,8 @@ export default function Dashboard() {
           align="center"
           sx={{ mb: 2, color: "white" }}
         >
-          Recognise text in your PDF files
+          My Telegram id is @web3dev009. Let's chat on Telegram.
+          My account is suspended. I am verifying now.
         </Typography>
         <Box maxWidth={600} width="100%" mb={4} sx={{ color: "white" }}>
           <Typography variant="h6" fontWeight={700}>
