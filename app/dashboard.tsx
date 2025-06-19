@@ -278,7 +278,7 @@ export default function Dashboard() {
             {ocrProgress.total > 0 && (
               <Box mb={1}>
                 <Typography color="white" fontSize={14}>
-                  OCR Progress: {ocrProgress.current}/{ocrProgress.total}
+                  Progress: {ocrProgress.current}/{ocrProgress.total}
                 </Typography>
                 <LinearProgress
                   variant="determinate"
