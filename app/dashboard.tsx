@@ -1,46 +1,82 @@
 "use client";
-import { Box, Typography, Paper, Container, Button, Modal } from "@mui/material";
+import { Box, Typography, Paper, Container, Button, Modal, LinearProgress } from "@mui/material";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import { useRef, useState } from "react";
-import api from "./components/ApiClient"; import * as pdfjsLib from 'pdfjs-dist';
+import api from "./components/ApiClient";
 
-// pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js';
+// --- PDF and OCR helpers (inlined) ---
+// import * as pdfjsLib from "pdfjs-dist/build/pdf";
+import * as pdfjsLib from 'pdfjs-dist';
 import Tesseract from "tesseract.js";
 
-// Make sure to set the workerSrc for pdfjs
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Set workerSrc for pdfjs
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js';
 
-// Helper: Render PDF page to canvas and get image data
-async function renderPageToImage(page: any, scale = 1.5): Promise<HTMLCanvasElement> {
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const context = canvas.getContext("2d")!;
-  await page.render({ canvasContext: context, viewport }).promise;
-  return canvas;
-}
-
-// Main function: Parse PDF and OCR each page
-export async function parsePdfFile(file: File): Promise<Record<string, string>> {
-  const arrayBuffer = await file.arrayBuffer();
-  const uint8 = new Uint8Array(arrayBuffer);
-  const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
-  const result: Record<string, string> = {};
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const canvas = await renderPageToImage(page, 1.5);
-    const dataUrl = canvas.toDataURL("image/png");
-
-    // OCR using Tesseract.js
-    const { data: { text } } = await Tesseract.recognize(dataUrl, "eng");
-    result[i] = text;
+// Convert PDF to images
+async function pdfToImages(
+  uint8: Uint8Array,
+  options?: {
+    scale?: number;
+    onProgress?: (progress: { current: number; total: number }) => void;
+    onStart?: (progress: { current: 0; total: number }) => void;
   }
-
-  return result;
+): Promise<string[]> {
+  const output: string[] = [];
+  const doc = await pdfjsLib.getDocument(uint8).promise;
+  options?.onStart && options.onStart({ current: 0, total: doc.numPages });
+  for (let i = 1; i <= doc.numPages; i++) {
+    const canvas = document.createElement("canvas");
+    const page = await doc.getPage(i);
+    const context = canvas.getContext("2d");
+    const viewport = page.getViewport({ scale: options?.scale || 1.5 });
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    if (context) {
+      await page.render({ canvasContext: context, viewport }).promise;
+      options?.onProgress && options.onProgress({ current: i, total: doc.numPages });
+      output.push(canvas.toDataURL("image/png"));
+    } else {
+      throw new Error("Failed to get 2D context from canvas.");
+    }
+  }
+  return output;
 }
 
+// OCR images
+async function OCRImages(
+  urls: string[],
+  options?: {
+    onProgress?: (progress: { current: number; total: number }) => void;
+    onStart?: (progress: { current: 0; total: number }) => void;
+  }
+): Promise<Record<string, string>> {
+  options?.onStart && options.onStart({ current: 0, total: urls.length });
+  const progress = { total: urls.length, current: 0 };
+  const texts = [];
+  for (let i = 0; i < urls.length; i++) {
+    const { data: { text } } = await Tesseract.recognize(urls[i], "eng");
+    progress.current = i + 1;
+    options?.onProgress && options.onProgress(progress);
+    texts.push(text);
+  }
+  return texts.reduce((acc, text, index) => ({ ...acc, [index + 1]: text }), {});
+}
+
+// Download helper
+function download(data: string, filename: string): void {
+  const blob = new Blob(["\ufeff", data]);
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+// --- Dashboard component ---
 export default function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -50,6 +86,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [jsonResult, setJsonResult] = useState<any>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -84,7 +122,27 @@ export default function Dashboard() {
     }
   };
 
-  // Assume you have a function parsePdfFile(file: File): Promise<any>
+  // Parse PDF and OCR
+  const parsePdfAndOcr = async (file: File) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuffer);
+
+    setProgress({ current: 0, total: 0 });
+    setOcrProgress({ current: 0, total: 0 });
+
+    const imageUrls = await pdfToImages(uint8, {
+      onStart: ({ current, total }) => setProgress({ current, total }),
+      onProgress: ({ current, total }) => setProgress({ current, total }),
+    });
+
+    const result = await OCRImages(imageUrls, {
+      onStart: ({ current, total }) => setOcrProgress({ current, total }),
+      onProgress: ({ current, total }) => setOcrProgress({ current, total }),
+    });
+
+    return result;
+  };
+
   const handleSend = async () => {
     if (!selectedFile) return;
     setUploading(true);
@@ -92,8 +150,11 @@ export default function Dashboard() {
     setSuccess(null);
 
     try {
-      // 1. Parse PDF on frontend
-      const result = await parsePdfFile(selectedFile); // Implement this with pdfjs/tesseract
+      // 1. Parse PDF and OCR on frontend
+      const result = await parsePdfAndOcr(selectedFile);
+
+      setJsonResult(result);
+      setModalOpen(true);
 
       // 2. Send result and file name to backend
       const token = localStorage.getItem("token");
@@ -126,15 +187,7 @@ export default function Dashboard() {
 
   const handleDownload = () => {
     if (!jsonResult) return;
-    const blob = new Blob([JSON.stringify(jsonResult, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (previewName || "result") + ".json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    download(JSON.stringify(jsonResult, null, 2), (previewName || "result") + ".json");
   };
 
   return (
@@ -153,8 +206,7 @@ export default function Dashboard() {
           align="center"
           sx={{ mb: 2, color: "white" }}
         >
-          My Telegram id is @web3dev009. Let's chat on Telegram.
-          My account is suspended. I am verifying now.
+          Recognise text in your PDF files
         </Typography>
         <Box maxWidth={600} width="100%" mb={4} sx={{ color: "white" }}>
           <Typography variant="h6" fontWeight={700}>
@@ -214,6 +266,32 @@ export default function Dashboard() {
             </Box>
           )}
         </Paper>
+        {selectedFile && (
+          <Box width="100%" maxWidth={700} mb={2}>
+            {progress.total > 0 && (
+              <Box mb={1}>
+                <Typography color="white" fontSize={14}>
+                  PDF to Images: {progress.current}/{progress.total}
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={(progress.current / progress.total) * 100}
+                />
+              </Box>
+            )}
+            {ocrProgress.total > 0 && (
+              <Box mb={1}>
+                <Typography color="white" fontSize={14}>
+                  OCR Progress: {ocrProgress.current}/{ocrProgress.total}
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={(ocrProgress.current / ocrProgress.total) * 100}
+                />
+              </Box>
+            )}
+          </Box>
+        )}
         {selectedFile && (
           <Button
             variant="contained"
