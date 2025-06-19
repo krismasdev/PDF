@@ -3,6 +3,42 @@ import { Box, Typography, Paper, Container, Button, Modal } from "@mui/material"
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import { useRef, useState } from "react";
 import api from "./components/ApiClient";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import Tesseract from "tesseract.js";
+
+// Make sure to set the workerSrc for pdfjs
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// Helper: Render PDF page to canvas and get image data
+async function renderPageToImage(page: any, scale = 1.5): Promise<HTMLCanvasElement> {
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const context = canvas.getContext("2d")!;
+  await page.render({ canvasContext: context, viewport }).promise;
+  return canvas;
+}
+
+// Main function: Parse PDF and OCR each page
+export async function parsePdfFile(file: File): Promise<Record<string, string>> {
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+  const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+  const result: Record<string, string> = {};
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const canvas = await renderPageToImage(page, 1.5);
+    const dataUrl = canvas.toDataURL("image/png");
+
+    // OCR using Tesseract.js
+    const { data: { text } } = await Tesseract.recognize(dataUrl, "eng");
+    result[i] = text;
+  }
+
+  return result;
+}
 
 export default function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,6 +83,7 @@ export default function Dashboard() {
     }
   };
 
+  // Assume you have a function parsePdfFile(file: File): Promise<any>
   const handleSend = async () => {
     if (!selectedFile) return;
     setUploading(true);
@@ -54,30 +91,33 @@ export default function Dashboard() {
     setSuccess(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      // 1. Parse PDF on frontend
+      const result = await parsePdfFile(selectedFile); // Implement this with pdfjs/tesseract
 
-      // Get token from localStorage
+      // 2. Send result and file name to backend
       const token = localStorage.getItem("token");
-
-      const res = await api.post("/pdf/send", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
+      const res = await api.post(
+        "/pdf/send",
+        {
+          file: selectedFile.name,
+          result,
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (res.data.success) {
-        setSuccess("File uploaded successfully!");
-        setJsonResult(res.data.result);
-        setModalOpen(true);
+        setSuccess("Result saved successfully!");
         setSelectedFile(null);
         setPreviewName("");
       } else {
-        setError(res.data.message || "Upload failed.");
+        setError(res.data.message || "Save failed.");
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Upload failed.");
+      setError(err.response?.data?.message || "Save failed.");
     } finally {
       setUploading(false);
     }
