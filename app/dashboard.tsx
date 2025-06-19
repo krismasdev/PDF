@@ -16,7 +16,7 @@ async function pdfToImages(
 ): Promise<string[]> {
   // Dynamically import pdfjs-dist only on the client
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const output: string[] = [];
   const doc = await pdfjsLib.getDocument(uint8).promise;
