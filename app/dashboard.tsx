@@ -3,7 +3,7 @@ import { Box, Typography, Paper, Container, Button, Modal } from "@mui/material"
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import { useRef, useState } from "react";
 import api from "./components/ApiClient";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import * as pdfjsLib from "pdfjs-dist/build/pdf.js";
 import Tesseract from "tesseract.js";
 
 // Make sure to set the workerSrc for pdfjs
