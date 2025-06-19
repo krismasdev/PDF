@@ -3,14 +3,16 @@ import { Box, Typography, Paper, Container, Button, Modal, LinearProgress } from
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import { useRef, useState } from "react";
 import api from "./components/ApiClient";
+import Tesseract from "tesseract.js";
 
 // --- PDF and OCR helpers (inlined) ---
 // import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import * as pdfjsLib from 'pdfjs-dist';
-import Tesseract from "tesseract.js";
+import * as pdfjsLib from "pdfjs-dist";
+pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + "/pdf.worker.min.mjs";
+
 
 // Set workerSrc for pdfjs
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Convert PDF to images
 async function pdfToImages(
