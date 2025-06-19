@@ -10,8 +10,8 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import Tesseract from "tesseract.js";
 
 // Set workerSrc for pdfjs
-// pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js';
 
 // Convert PDF to images
 async function pdfToImages(
