@@ -8,8 +8,7 @@ import Tesseract from "tesseract.js";
 // --- PDF and OCR helpers (inlined) ---
 // import * as pdfjsLib from "pdfjs-dist/build/pdf";
 import * as pdfjsLib from "pdfjs-dist";
-pdfjsLib.GlobalWorkerOptions.workerSrc = window.location.origin + "/pdf.worker.min.mjs";
-
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 // Set workerSrc for pdfjs
 // pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
