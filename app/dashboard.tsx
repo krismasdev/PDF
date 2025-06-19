@@ -6,7 +6,7 @@ import api from "./components/ApiClient";
 
 // --- PDF and OCR helpers (inlined) ---
 // import * as pdfjsLib from "pdfjs-dist/build/pdf";
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import Tesseract from "tesseract.js";
 
 // Set workerSrc for pdfjs
